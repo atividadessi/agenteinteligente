@@ -19,7 +19,7 @@ public class Sensor {
     private int tamanhoAmbienteX;
     private int tamanhoAmbienteY;
 
-    private int[][] posicoesLimpo;
+    private int qtdSujeiraLimpa = 0;
 
     @Getter @Setter
     private boolean obstaculo = false, sujo = false, limpo = false;
@@ -42,22 +42,33 @@ public class Sensor {
         obstaculo = false;
     }
 
+    private void verificaSeTemObstaculos(){
+
+    }
+
     public void obterPercepcao() {
-        int helpADM = 0;
+        if (ambiente.getQtdSujeira() == 0){
+            logger.info("Ambiente já esta limpo, robô sendo desligado");
+            return;
+        }
+
         for (int i = 0; i < 10; ++i) {
+            if(qtdSujeiraLimpa == ambiente.getQtdSujeira()) {
+                break;
+            }
             reset();
-            if(verificaSujeiraFrente()){
+            if(verificaSujeiraFrente(robo.getPosX(), robo.getPosY())){
                 continue;
-            } else if (verificaSujeiraDireita()) {
+            } else if (verificaSujeiraDireita(robo.getPosX(), robo.getPosY())) {
                 continue;
-            } else if (verificaSujeiraTras()) {
+            } else if (verificaSujeiraTras(robo.getPosX(), robo.getPosY())) {
                 continue;
-            } else if (verificaSujeiraEsquerda()) {
+            } else if (verificaSujeiraEsquerda(robo.getPosX(), robo.getPosY())) {
                 continue;
-            } else if (helpADM == 4) {
-                new Exception("Erro desconhecido ao tentar se movimentar pelo ambiente");
-            }else {
-                helpADM++;
+            } else if (qtdSujeiraLimpa == ambiente.getQtdSujeira()) {
+                System.out.println("Fim.");
+                return;
+            } else {
                 motor.executarAcao(sujo, ambiente, robo, aspirador);
             }
         }
@@ -65,19 +76,15 @@ public class Sensor {
         logger.info("Percepção: {Obstáculo: " + obstaculo + ", Sujo: " + sujo + "}");
     }
 
-    public boolean verificaSujeiraFrente(){
-        posX = robo.getPosX();
-        posY = robo.getPosY();
-
-        if (posY > 0) {
+    public boolean verificaSujeiraFrente(int posX, int posY){
+        posY = posY-1;
+        if (posY >= 0 && !ambiente.isObstaculo(posX, posY)) {
             // verifica frente
-            sujo = ambiente.isSujo(posX, posY - 1);
-            limpo = ambiente.isClean(posX, posY - 1);
-
-            if(ambiente.isObstaculo(posX, posY-1)){return false;}
+            sujo = ambiente.isSujo(posX, posY);
+            limpo = ambiente.isClean(posX, posY);
 
             if(limpo){
-                for (int y = posY-2; y >= 0; y--) {
+                for (int y = posY; y >= 0; y--) {
                     sujo = ambiente.isSujo(posX, y);
 
                     if (ambiente.isObstaculo(posX, y)){break;}
@@ -87,11 +94,14 @@ public class Sensor {
                         robo.setDirecaoX(posX);
                         robo.setDirecao(AcaoAgente.MOVER_FRENTE);
                         motor.executarAcao(sujo, ambiente, robo, aspirador);
+                        qtdSujeiraLimpa++;
                     }
+                    verificaSujeiraDireita(posX, y);
+                    verificaSujeiraEsquerda(posX, y);
                 }
 
                 if(!sujo){
-                    robo.setDirecaoY(posY-1);
+                    robo.setDirecaoY(posY);
                     robo.setDirecaoX(posX);
                     robo.setDirecao(AcaoAgente.MOVER_FRENTE);
                 }
@@ -99,29 +109,26 @@ public class Sensor {
             }
 
             if(sujo){
-                robo.setDirecaoY(posY-1);
+                robo.setDirecaoY(posY);
                 robo.setDirecaoX(posX);
                 robo.setDirecao(AcaoAgente.MOVER_FRENTE);
                 motor.executarAcao(sujo, ambiente, robo, aspirador);
+                qtdSujeiraLimpa++;
             }
         }
 
         return sujo;
     }
 
-    private boolean verificaSujeiraEsquerda() {
-        posX = robo.getPosX();
-        posY = robo.getPosY();
-
-        if (posX > 0) {
+    private boolean verificaSujeiraEsquerda(int posX, int posY) {
+        posX = posX -1;
+        if (posX >= 0 && !ambiente.isObstaculo(posX, posY)) {
             // verifica esquerda
-            sujo = ambiente.isSujo(posX -1, posY );
-            limpo = ambiente.isClean(posX-1, posY);
-
-            if(ambiente.isObstaculo(posX -1, posY)){return false; }
+            sujo = ambiente.isSujo(posX, posY );
+            limpo = ambiente.isClean(posX, posY);
 
             if(limpo){
-                for (int x = posX-2; x >= 0; x--) {
+                for (int x = posX; x >= 0; x--) {
                     sujo = ambiente.isSujo(x, posY);
 
                     if (ambiente.isObstaculo(x, posY)){break;}
@@ -131,64 +138,70 @@ public class Sensor {
                         robo.setDirecaoX(x);
                         robo.setDirecao(AcaoAgente.GIRAR_ESQUERDA);
                         motor.executarAcao(sujo, ambiente, robo, aspirador);
+                        qtdSujeiraLimpa++;
                     }
+                    verificaSujeiraFrente(x, posY);
+                    verificaSujeiraTras(x, posY);
                 }
 
                 if(!sujo){
                     robo.setDirecaoY(posY);
-                    robo.setDirecaoX(posX -1);
+                    robo.setDirecaoX(posX);
                     robo.setDirecao(AcaoAgente.GIRAR_ESQUERDA);
                 }
             }
 
             if(sujo){
                 robo.setDirecaoY(posY);
-                robo.setDirecaoX(posX -1);
+                robo.setDirecaoX(posX);
                 robo.setDirecao(AcaoAgente.GIRAR_ESQUERDA);
                 motor.executarAcao(sujo, ambiente, robo, aspirador);
+                qtdSujeiraLimpa++;
             }
         }
 
         return sujo;
     }
 
-    private boolean verificaSujeiraTras() {
-        posX = robo.getPosX();
-        posY = robo.getPosY();
+    private boolean verificaSujeiraTras(int posX, int posY) {
+//        posX = robo.getPosX();
+//        posY = robo.getPosY();
 
-        if (posY < tamanhoAmbienteY-1) {
+        posY = posY + 1;
+        if (posY < tamanhoAmbienteY-1 && !ambiente.isObstaculo(posX, posY)) {
             // verifica trás
-            sujo = ambiente.isSujo(posX, posY + 1);
-            limpo = ambiente.isClean(posX, posY + 1);
 
-            if(ambiente.isObstaculo(posX, posY + 1)){
-                return false;
-            }
+            sujo = ambiente.isSujo(posX,posY );
+            limpo = ambiente.isClean(posX,posY);
 
             if(limpo){
-                for (int y = posY+2; y <= tamanhoAmbienteY-1; y++) {
+                for (int y = posY; y <= tamanhoAmbienteY-1; y++) {
                     sujo = ambiente.isSujo(posX, y);
                     obstaculo = ambiente.isObstaculo(posX, y);
-                    if (obstaculo){
-                        break;
-                    }
+
+                    if (obstaculo){ break;}
+
                     if(sujo){
                         robo.setDirecaoY(y);
                         robo.setDirecaoX(posX);
                         robo.setDirecao(AcaoAgente.MOVER_TRAS);
                         motor.executarAcao(sujo, ambiente, robo, aspirador);
+                        reset();
+                        qtdSujeiraLimpa++;
                     }
+                    verificaSujeiraDireita(posX,posY);
+                    verificaSujeiraEsquerda(posX,posY);
                 }
 
                 if(!sujo){
-                    robo.setDirecaoY(posY + 1);
+                    robo.setDirecaoY(posY);
                     robo.setDirecaoX(posX);
                     robo.setDirecao(AcaoAgente.MOVER_TRAS);
                 }
             }
 
             if(sujo){
-                robo.setDirecaoY(posY + 1);
+                robo.setDirecaoY(posY);
                 robo.setDirecaoX(posX);
                 robo.setDirecao(AcaoAgente.MOVER_TRAS);
                 motor.executarAcao(sujo, ambiente, robo, aspirador);
@@ -197,19 +210,15 @@ public class Sensor {
         return sujo;
     }
 
-    private boolean verificaSujeiraDireita() {
-        posX = robo.getPosX();
-        posY = robo.getPosY();
-
-        if (posX < tamanhoAmbienteX-1) {
+    private boolean verificaSujeiraDireita(int posX, int posY) {
+        posX = posX + 1;
+        if (posX <= tamanhoAmbienteX-1 && !ambiente.isObstaculo(posX, posY)) {
             // verifica direita
-            sujo = ambiente.isSujo(posX + 1, posY);
-            limpo = ambiente.isClean(posX + 1, posY);
-
-            if(ambiente.isObstaculo(posX + 1, posY)){ return false;}
+            sujo = ambiente.isSujo(posX, posY);
+            limpo = ambiente.isClean(posX, posY);
 
             if(limpo){
-                for (int x = posX+2; x <= tamanhoAmbienteX-1; x++) {
+                for (int x = posX; x <= tamanhoAmbienteX-1; x++) {
                     sujo = ambiente.isSujo(x, posY);
 
                     if (ambiente.isObstaculo(x, posY)){break;}
@@ -219,28 +228,28 @@ public class Sensor {
                         robo.setDirecaoX(x);
                         robo.setDirecao(AcaoAgente.GIRAR_DIREITA);
                         motor.executarAcao(sujo, ambiente, robo, aspirador);
+                        qtdSujeiraLimpa++;
                     }
+                    verificaSujeiraFrente(x,posY);
+                    verificaSujeiraTras(x,posY);
                 }
 
                 if(!sujo){
                     robo.setDirecaoY(posY);
-                    robo.setDirecaoX(posX + 1);
+                    robo.setDirecaoX(posX);
                     robo.setDirecao(AcaoAgente.GIRAR_DIREITA);
                 }
             }
 
             if(sujo){
                 robo.setDirecaoY(posY);
-                robo.setDirecaoX(posX + 1);
+                robo.setDirecaoX(posX);
                 robo.setDirecao(AcaoAgente.GIRAR_DIREITA);
                 motor.executarAcao(sujo, ambiente, robo, aspirador);
+                qtdSujeiraLimpa++;
             }
         }
 
         return sujo;
     }
-
 }
-
-
-
